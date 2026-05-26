@@ -1,3 +1,4 @@
+#include <cstddef>
 #include "anti_replay.hpp"
 #include <sstream>
 #include <iomanip>

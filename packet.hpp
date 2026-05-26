@@ -1,13 +1,15 @@
 #pragma once
-#include <array>
-#include <cstdint>
-#include <vector>
 
-constexpr size_t SESSION_ID_SIZE = 4;
-constexpr size_t TIMESTAMP_SIZE = 8;
-constexpr size_t NONCE_SIZE = 12;
-constexpr size_t TAG_SIZE = 16;
-constexpr size_t HEADER_SIZE = SESSION_ID_SIZE + TIMESTAMP_SIZE + NONCE_SIZE;
+#include <array>
+#include <vector>
+#include <cstdint>
+#include <cstddef>
+
+constexpr std::size_t SESSION_ID_SIZE = 4;
+constexpr std::size_t TIMESTAMP_SIZE  = 8;
+constexpr std::size_t NONCE_SIZE      = 12;
+constexpr std::size_t TAG_SIZE        = 16;
+constexpr std::size_t HEADER_SIZE     = SESSION_ID_SIZE + TIMESTAMP_SIZE + NONCE_SIZE;
 
 struct SecurePacket {
     uint32_t session_id;

@@ -81,7 +81,7 @@ int main() {
     sockaddr_in sat_addr{};
     sat_addr.sin_family = AF_INET;
     sat_addr.sin_port = htons(9000);
-    inet_pton(AF_INET, "127.0.0.1", &sat_addr.sin_addr);
+    inet_pton(AF_INET, "192.168.10.20", &sat_addr.sin_addr);
 
     EVP_PKEY* ground_keypair = generate_x25519_keypair();
     std::vector<unsigned char> ground_public = get_raw_public_key(ground_keypair);

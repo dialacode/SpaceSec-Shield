@@ -1,3 +1,4 @@
+#include <cstddef>
 #include "packet.hpp"
 
 static void write_u32_be(std::vector<unsigned char>& out, uint32_t value) {
@@ -13,14 +14,14 @@ static void write_u64_be(std::vector<unsigned char>& out, uint64_t value) {
     }
 }
 
-static uint32_t read_u32_be(const std::vector<unsigned char>& data, size_t offset) {
+static uint32_t read_u32_be(const std::vector<unsigned char>& data, std::size_t offset) {
     return ((uint32_t)data[offset] << 24) |
            ((uint32_t)data[offset + 1] << 16) |
            ((uint32_t)data[offset + 2] << 8) |
            ((uint32_t)data[offset + 3]);
 }
 
-static uint64_t read_u64_be(const std::vector<unsigned char>& data, size_t offset) {
+static uint64_t read_u64_be(const std::vector<unsigned char>& data, std::size_t offset) {
     uint64_t value = 0;
     for (int i = 0; i < 8; ++i) {
         value = (value << 8) | data[offset + i];
@@ -58,22 +59,22 @@ bool deserialize_packet(const std::vector<unsigned char>& data, SecurePacket& pa
     packet.session_id = read_u32_be(data, 0);
     packet.timestamp_ms = read_u64_be(data, 4);
 
-    size_t offset = 12;
+    std::size_t offset = 12;
 
-    for (size_t i = 0; i < NONCE_SIZE; ++i) {
+    for (std::size_t i = 0; i < NONCE_SIZE; ++i) {
         packet.nonce[i] = data[offset + i];
     }
 
     offset += NONCE_SIZE;
 
-    size_t ciphertext_len = data.size() - HEADER_SIZE - TAG_SIZE;
+    std::size_t ciphertext_len = data.size() - HEADER_SIZE - TAG_SIZE;
 
     packet.ciphertext.assign(
         data.begin() + HEADER_SIZE,
         data.begin() + HEADER_SIZE + ciphertext_len
     );
 
-    for (size_t i = 0; i < TAG_SIZE; ++i) {
+    for (std::size_t i = 0; i < TAG_SIZE; ++i) {
         packet.tag[i] = data[HEADER_SIZE + ciphertext_len + i];
     }
 
