@@ -13,3 +13,25 @@ __pycache__/
 venv/
 .venv/
 *.log
+
+# C/C++ build outputs
+*.o
+*.out
+*.bin
+secure_ground
+secure_satellite
+ground
+satellite
+test_*
+
+# Virtual machines and large archives
+*.vdi
+*.vmdk
+*.ova
+*.ovf
+*.zip
+*.tar.gz
+
+# Packet captures - avoid accidental large uploads
+*.pcap
+*.pcapng
