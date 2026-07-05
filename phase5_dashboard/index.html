@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpaceSec Shield — Live Monitor</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:#0b1020; --panel:#121a32; --panel2:#0e1530; --line:#223; --text:#e6e9f0;
+      --muted:#8b93ad; --green:#3ddc84; --red:#ff5c5c; --amber:#f0b429; --blue:#5b8def;
+    }
+    * { box-sizing:border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: radial-gradient(1200px 600px at 70% -10%, #16203f 0%, var(--bg) 55%);
+      color: var(--text); margin:0; padding:24px; min-height:100vh;
+    }
+    header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
+    h1 { font-size:22px; margin:0; letter-spacing:.3px; }
+    h1 .dot { color:var(--green); }
+    .sub { color:var(--muted); font-size:13px; margin-top:2px; }
+
+    .status {
+      font-size:15px; font-weight:700; padding:8px 18px; border-radius:999px;
+      display:inline-flex; align-items:center; gap:8px; letter-spacing:.5px;
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .status::before { content:""; width:9px; height:9px; border-radius:50%; background:currentColor; box-shadow:0 0 10px currentColor; }
+    .CONNECTED    { background:rgba(14,122,59,.18);  color:#5be59a; }
+    .DEGRADED     { background:rgba(184,134,11,.18);  color:#ffce5a; }
+    .DISCONNECTED { background:rgba(122,18,18,.18);    color:#ff8a8a; }
+
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px; }
+    .card {
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid var(--line); border-radius:14px; padding:16px 18px;
+    }
+    .card .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.6px; }
+    .card .value { font-size:34px; font-weight:800; margin-top:6px; }
+    .card.acc .value { color:var(--green); }
+    .card.rej .value { color:var(--red); }
+    .card.lat .value { color:var(--blue); }
+    .card .unit { font-size:14px; font-weight:600; color:var(--muted); }
+
+    .panel {
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:18px;
+    }
+    .panel h3 { margin:0 0 12px; font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
+
+    #feed { max-height:300px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+    .alert {
+      padding:10px 14px; border-radius:10px; font-size:14px; display:flex; gap:10px; align-items:center;
+      border-left:4px solid transparent; animation:pop .25s ease;
+    }
+    .alert .badge { font-weight:800; font-size:11px; padding:2px 8px; border-radius:6px; letter-spacing:.5px; }
+    .alert .reason { font-weight:700; }
+    .alert .meta { color:var(--muted); font-size:12px; margin-left:auto; white-space:nowrap; }
+    .alert.CRITICAL { background:rgba(122,18,18,.25); border-left-color:var(--red); }
+    .alert.CRITICAL .badge { background:var(--red); color:#1a0606; }
+    .alert.MEDIUM   { background:rgba(138,109,26,.22); border-left-color:var(--amber); }
+    .alert.MEDIUM .badge { background:var(--amber); color:#231a02; }
+    .alert.LOW      { background:rgba(26,74,138,.22); border-left-color:var(--blue); }
+    .alert.LOW .badge { background:var(--blue); color:#04122b; }
+    .empty { color:var(--muted); font-size:13px; padding:8px 0; }
+
+    button {
+      background:#1b2546; color:var(--text); border:1px solid var(--line);
+      padding:8px 16px; border-radius:10px; font-size:13px; cursor:pointer;
+    }
+    button:hover { background:#243160; }
+
+    @keyframes pop { from { transform:translateY(-4px); opacity:0; } to { transform:none; opacity:1; } }
+    @keyframes flash {
+      0%,100% { box-shadow:0 0 0 0 rgba(255,92,92,0); }
+      30%     { box-shadow:0 0 0 6px rgba(255,92,92,.45); }
+    }
+    .flash { animation:flash .7s ease 2; }
+    @media (max-width:720px){ .grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1><span class="dot">●</span> SpaceSec Shield — Live Monitor</h1>
+      <div class="sub">CubeSat secure command link · ChaCha20-Poly1305 AEAD · real-time security events</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span>Link status:</span>
+      <span id="status" class="status DISCONNECTED">—</span>
+      <button id="reset">Reset</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="card acc"><div class="label">Accepted commands</div><div class="value" id="acc">0</div></div>
+    <div class="card rej"><div class="label">Rejected packets</div><div class="value" id="rej">0</div></div>
+    <div class="card lat"><div class="label">Avg latency</div><div class="value"><span id="lat">0</span> <span class="unit">ms</span></div></div>
+  </div>
+
+  <div class="panel">
+    <h3>Packet flow (accepted vs rejected)</h3>
+    <canvas id="chart" height="92"></canvas>
+  </div>
+
+  <div class="panel">
+    <h3>Security alerts</h3>
+    <div id="feed"><div class="empty">No security events yet. Waiting for the Satellite Node…</div></div>
+  </div>
+
+  <script>
+    const chart = new Chart(document.getElementById('chart'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label:'Accepted', data:[], borderColor:'#3ddc84', backgroundColor:'rgba(61,220,132,.12)', fill:true, tension:.3, pointRadius:0 },
+        { label:'Rejected', data:[], borderColor:'#ff5c5c', backgroundColor:'rgba(255,92,92,.12)', fill:true, tension:.3, pointRadius:0 }
+      ]},
+      options: {
+        animation:false, responsive:true,
+        plugins:{ legend:{ labels:{ color:'#cdd3e6' } } },
+        scales:{
+          x:{ ticks:{ color:'#8b93ad', maxTicksLimit:8 }, grid:{ color:'rgba(255,255,255,.05)' } },
+          y:{ beginAtZero:true, ticks:{ color:'#8b93ad', precision:0 }, grid:{ color:'rgba(255,255,255,.05)' } }
+        }
+      }
+    });
+
+    let lastCriticalSeen = 0;   // timestamp of the last CRITICAL we flashed for
+
+    async function tick() {
+      let s;
+      try {
+        const r = await fetch('/api/state');
+        s = await r.json();
+      } catch (err) { return; }   // dashboard restarting / network blip
+
+      // --- Status banner ---
+      const el = document.getElementById('status');
+      el.textContent = s.link_status;
+      el.className = 'status ' + s.link_status;
+
+      // --- Stat cards ---
+      document.getElementById('acc').textContent = s.accepted;
+      document.getElementById('rej').textContent = s.rejected;
+      document.getElementById('lat').textContent = s.avg_latency_ms;
+
+      // --- Chart: push a new time point (cumulative counters) ---
+      chart.data.labels.push(new Date().toLocaleTimeString());
+      chart.data.datasets[0].data.push(s.accepted);
+      chart.data.datasets[1].data.push(s.rejected);
+      if (chart.data.labels.length > 30) {
+        chart.data.labels.shift();
+        chart.data.datasets.forEach(d => d.data.shift());
+      }
+      chart.update();
+
+      // --- Alert feed (rejected events, newest first) ---
+      const feed = document.getElementById('feed');
+      const rejected = s.recent.filter(e => e.type === 'REJECTED').reverse();
+      if (rejected.length === 0) {
+        feed.innerHTML = '<div class="empty">No rejections yet — link is clean.</div>';
+      } else {
+        feed.innerHTML = '';
+        rejected.forEach(e => {
+          const sev = e.severity || 'LOW';
+          const t = new Date(e.timestamp).toLocaleTimeString();
+          const div = document.createElement('div');
+          div.className = 'alert ' + sev;
+          div.innerHTML =
+            `<span class="badge">${sev}</span>` +
+            `<span class="reason">${e.reason}</span>` +
+            `<span>session ${e.session_id || '?'}</span>` +
+            `<span class="meta">${t}</span>`;
+          feed.appendChild(div);
+        });
+      }
+
+      // --- Flash the status banner on a NEW critical event ---
+      const newestCritical = s.recent
+        .filter(e => e.type === 'REJECTED' && e.severity === 'CRITICAL')
+        .map(e => e.timestamp)
+        .reduce((a, b) => Math.max(a, b), 0);
+      if (newestCritical > lastCriticalSeen) {
+        lastCriticalSeen = newestCritical;
+        el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+      }
+    }
+
+    document.getElementById('reset').addEventListener('click', async () => {
+      await fetch('/api/reset', { method:'POST' });
+      chart.data.labels = []; chart.data.datasets.forEach(d => d.data = []); chart.update();
+      lastCriticalSeen = 0;
+    });
+
+    setInterval(tick, 1000);
+    tick();
+  </script>
+</body>
+</html>
